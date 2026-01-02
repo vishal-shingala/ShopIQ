@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { useRouter } from "next/navigation";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
@@ -18,17 +19,25 @@ import { Textarea } from "@/components/ui/textarea";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Loader2 } from "lucide-react";
 
-const formSchema = z.object({
-  productName: z.string().min(2, {
-    message: "Product name must be at least 2 characters.",
-  }),
-  price: z.number().min(0.01, {
-    message: "Price must be greater than 0.",
-  }),
-  reviews: z.string().min(10, {
-    message: "Reviews must be at least 10 characters.",
-  }),
-});
+const formSchema = z
+  .object({
+    productLink: z
+      .string()
+      .min(5)
+      .refine((v) => /^https?:\/\//i.test(v), {
+        message: 'Product link must start with http or https',
+      }),
+    productName: z.string().min(2, {
+      message: 'Product name must be at least 2 characters.',
+    }),
+    description: z.string().min(10, {
+      message: 'Provide a product description or paste reviews (min 10 chars).',
+    }),
+  })
+  .refine((v) => !!v.description?.trim(), {
+    message: 'Product description or reviews are required',
+    path: ['description'],
+  });
 
 interface AnalysisResult {
   pros: string[];
@@ -41,20 +50,17 @@ interface AnalysisResult {
   };
 }
 
-interface Props {
-  onAnalysis: (result: AnalysisResult) => void;
-}
-
-export default function ReviewForm({ onAnalysis }: Props) {
+export default function ReviewForm() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  const router = useRouter();
 
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
     defaultValues: {
-      productName: "",
-      price: 0,
-      reviews: "",
+      productLink: '',
+      productName: '',
+      description: '',
     },
   });
 
@@ -63,18 +69,31 @@ export default function ReviewForm({ onAnalysis }: Props) {
     setLoading(true);
     try {
       const base = process.env.NEXT_PUBLIC_API_URL ?? "";
-      const apiUrl = base ? `${base.replace(/\/$/, "")}/analyze-reviews` : "/api/analyze-reviews";
+      const apiUrl = base ? `${base.replace(/\/$/, '')}/analyze-product` : '/analyze-product';
+
+      const payload = {
+        productLink: values.productLink,
+        productName: values.productName,
+        description: values.description,
+      };
 
       const response = await fetch(apiUrl, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(values),
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
       });
       const data = await response.json();
-      if (data.success) {
-        onAnalysis(data.data);
+      // Backend returns either { error: '...' } or the analysis object
+      if (data?.error) {
+        setError(data.error);
       } else {
-        setError(data.error || "Analysis failed");
+        // Save analysis result to sessionStorage and navigate to result page
+        try {
+          sessionStorage.setItem('analysisResult', JSON.stringify(data));
+          router.push('/analyze/result');
+        } catch (e) {
+          setError('Failed to store analysis result');
+        }
       }
     } catch (err) {
       setError("Network error");
@@ -94,6 +113,20 @@ export default function ReviewForm({ onAnalysis }: Props) {
 
         <FormField
           control={form.control}
+          name="productLink"
+          render={({ field }) => (
+            <FormItem>
+              <FormLabel>Product Link</FormLabel>
+              <FormControl>
+                <Input placeholder="https://example.com/product/123" {...field} />
+              </FormControl>
+              <FormMessage />
+            </FormItem>
+          )}
+        />
+
+        <FormField
+          control={form.control}
           name="productName"
           render={({ field }) => (
             <FormItem>
@@ -108,32 +141,13 @@ export default function ReviewForm({ onAnalysis }: Props) {
 
         <FormField
           control={form.control}
-          name="price"
+          name="description"
           render={({ field }) => (
             <FormItem>
-              <FormLabel>Price</FormLabel>
-              <FormControl>
-                <Input
-                  type="number"
-                  step="0.01"
-                  placeholder="99.99"
-                  {...field}
-                />
-              </FormControl>
-              <FormMessage />
-            </FormItem>
-          )}
-        />
-
-        <FormField
-          control={form.control}
-          name="reviews"
-          render={({ field }) => (
-            <FormItem>
-              <FormLabel>Reviews</FormLabel>
+              <FormLabel>Product Description / Reviews</FormLabel>
               <FormControl>
                 <Textarea
-                  placeholder="Paste reviews here..."
+                  placeholder="Paste product description or reviews here..."
                   className="min-h-[150px]"
                   {...field}
                 />
