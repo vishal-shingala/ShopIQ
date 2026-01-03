@@ -18,6 +18,7 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Loader2 } from "lucide-react";
+import axios from "axios";
 
 const formSchema = z
   .object({
@@ -25,18 +26,18 @@ const formSchema = z
       .string()
       .min(5)
       .refine((v) => /^https?:\/\//i.test(v), {
-        message: 'Product link must start with http or https',
+        message: "Product link must start with http or https",
       }),
     productName: z.string().min(2, {
-      message: 'Product name must be at least 2 characters.',
+      message: "Product name must be at least 2 characters.",
     }),
     description: z.string().min(10, {
-      message: 'Provide a product description or paste reviews (min 10 chars).',
+      message: "Provide a product description or paste reviews (min 10 chars).",
     }),
   })
   .refine((v) => !!v.description?.trim(), {
-    message: 'Product description or reviews are required',
-    path: ['description'],
+    message: "Product description or reviews are required",
+    path: ["description"],
   });
 
 interface AnalysisResult {
@@ -58,9 +59,9 @@ export default function ReviewForm() {
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
     defaultValues: {
-      productLink: '',
-      productName: '',
-      description: '',
+      productLink: "",
+      productName: "",
+      description: "",
     },
   });
 
@@ -68,34 +69,37 @@ export default function ReviewForm() {
     setError("");
     setLoading(true);
     try {
-      const base = process.env.NEXT_PUBLIC_API_URL ?? "";
-      const apiUrl = base ? `${base.replace(/\/$/, '')}/analyze-product` : '/analyze-product';
-
+      const base = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:4000";
+      const apiUrl = base
+        ? `${base.replace(/\/$/, "")}/analyze-product`
+        : "/analyze-product";
+      console.log("API URL:", apiUrl);
       const payload = {
         productLink: values.productLink,
         productName: values.productName,
         description: values.description,
       };
+      console.log("Payload:", payload);
 
-      const response = await fetch(apiUrl, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload),
-      });
-      const data = await response.json();
+      // Use axios instead of fetch
+      const response = await axios.post(apiUrl, payload);
+      const data = response.data;
+
       // Backend returns either { error: '...' } or the analysis object
       if (data?.error) {
         setError(data.error);
       } else {
         // Save analysis result to sessionStorage and navigate to result page
         try {
-          sessionStorage.setItem('analysisResult', JSON.stringify(data));
-          router.push('/analyze/result');
+          sessionStorage.setItem("analysisResult", JSON.stringify(data));
+          router.push("/analyze/result");
         } catch (e) {
-          setError('Failed to store analysis result');
+          console.error("Storage error:", e);
+          setError("Failed to store analysis result");
         }
       }
     } catch (err) {
+      console.error("Submission error:", err);
       setError("Network error");
     } finally {
       setLoading(false);
@@ -118,7 +122,10 @@ export default function ReviewForm() {
             <FormItem>
               <FormLabel>Product Link</FormLabel>
               <FormControl>
-                <Input placeholder="https://example.com/product/123" {...field} />
+                <Input
+                  placeholder="https://example.com/product/123"
+                  {...field}
+                />
               </FormControl>
               <FormMessage />
             </FormItem>

@@ -1,26 +1,34 @@
-import { NextRequest, NextResponse } from 'next/server';
+import { NextRequest, NextResponse } from "next/server";
 
 export async function POST(request: NextRequest) {
   try {
+    console.log("Proxying /analyze-product request to backend");
     const body = await request.json();
-    const backendBase = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000';
-    const target = `${backendBase.replace(/\/$/, '')}/analyze-product`;
+    const backendBase =
+      process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000";
+    const target = `${backendBase.replace(/\/$/, "")}/analyze-product`;
     // quick health check to provide clearer error messages
-    const healthUrl = `${backendBase.replace(/\/$/, '')}/health`;
+    const healthUrl = `${backendBase.replace(/\/$/, "")}/health`;
     try {
-      const health = await fetch(healthUrl, { method: 'GET' });
+      const health = await fetch(healthUrl, { method: "GET" });
       if (!health.ok) {
-        console.error('Backend health check failed', await health.text());
-        return NextResponse.json({ error: 'Backend unhealthy' }, { status: 502 });
+        console.error("Backend health check failed", await health.text());
+        return NextResponse.json(
+          { error: "Backend unhealthy" },
+          { status: 502 }
+        );
       }
     } catch (hErr: any) {
-      console.error('Backend health check error', hErr);
-      return NextResponse.json({ error: `Backend unreachable at ${backendBase}` }, { status: 502 });
+      console.error("Backend health check error", hErr);
+      return NextResponse.json(
+        { error: `Backend unreachable at ${backendBase}` },
+        { status: 502 }
+      );
     }
 
     const resp = await fetch(target, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
       body: JSON.stringify(body),
     });
 
@@ -32,7 +40,7 @@ export async function POST(request: NextRequest) {
       return new NextResponse(data, { status: resp.status });
     }
   } catch (err: any) {
-    console.error('Proxy error to backend analyze-product:', err);
-    return NextResponse.json({ error: 'Backend unreachable' }, { status: 502 });
+    console.error("Proxy error to backend analyze-product:", err);
+    return NextResponse.json({ error: "Backend unreachable" }, { status: 502 });
   }
 }
