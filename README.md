@@ -46,4 +46,5 @@ cd backend && npm run build && cd ..
 # start
 cd frontend && npm run start && cd ..
 cd backend && npm run start && cd ..
+
 ```
